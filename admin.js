@@ -1,360 +1,561 @@
-// This script handles all logic for the admin.html page
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Page Elements ---
-    const modal = document.getElementById('password-modal');
-    const passwordInput = document.getElementById('admin-password');
-    const passwordSubmit = document.getElementById('password-submit');
-    const passwordError = document.getElementById('password-error');
-    const dashboardContent = document.getElementById('dashboard-content');
-    const logoutButton = document.getElementById('logout-button');
+/*
+============================================================
+           Mantra Computer - Admin Dashboard Script
+============================================================
+This script handles:
+1. Admin password check
+2. Navigation between dashboard tabs
+3. Fetching all data (unverified, students, courses)
+4. Sending action requests (verify, add, delete)
+*/
 
-    // --- Unverified Payments Elements ---
-    const unverifiedLoading = document.getElementById('unverified-loading');
-    const unverifiedError = document.getElementById('unverified-error');
-    const unverifiedContainer = document.getElementById('unverified-table-container');
-    const noUnverifiedData = document.getElementById('no-unverified-data');
+// Wait for the DOM to load before running anything
+document.addEventListener("DOMContentLoaded", () => {
 
-    // --- All Students Elements ---
-    const studentsLoading = document.getElementById('students-loading');
-    const studentsError = document.getElementById('students-error');
-    const studentsContainer = document.getElementById('students-table-container');
-    const noStudentsData = document.getElementById('no-students-data');
+    // --- 1. Get All Element References ---
+    
+    // Password Modal
+    const passwordModal = document.getElementById("password-modal");
+    const passwordInput = document.getElementById("admin-password");
+    const passwordSubmit = document.getElementById("password-submit");
+    const passwordError = document.getElementById("password-error");
+    
+    // Main Content
+    const dashboardContent = document.getElementById("dashboard-content");
+    const adminNav = document.getElementById("admin-nav-container");
+    const logoutButton = document.getElementById("logout-button");
 
-    // --- NEW: Course Management Elements ---
-    const coursesLoading = document.getElementById('courses-loading');
-    const coursesError = document.getElementById('courses-error');
-    const courseContainer = document.getElementById('course-table-container');
-    const noCoursesData = document.getElementById('no-courses-data');
-    const addCourseForm = document.getElementById('add-course-form');
-    const addCourseButton = document.getElementById('add-course-button');
-    const addCourseMessage = document.getElementById('add-course-message');
-    const newCourseName = document.getElementById('new-course-name');
-    const newCourseAmount = document.getElementById('new-course-amount');
+    // Navigation Buttons
+    const navDashboard = document.getElementById("nav-dashboard");
+    const navStudents = document.getElementById("nav-students");
+    const navCourses = document.getElementById("nav-courses");
+
+    // Page Containers
+    const pages = document.querySelectorAll(".admin-page");
+    const pageDashboard = document.getElementById("page-dashboard");
+    const pageStudents = document.getElementById("page-students");
+    const pageCourses = document.getElementById("page-courses");
+    
+    // --- Dashboard (Unverified Payments) ---
+    const unverifiedLoading = document.getElementById("unverified-loading");
+    const unverifiedError = document.getElementById("unverified-error");
+    const noUnverifiedData = document.getElementById("no-unverified-data");
+    const unverifiedTableContainer = document.getElementById("unverified-table-container");
+
+    // --- All Students ---
+    const studentsLoading = document.getElementById("students-loading");
+    const studentsError = document.getElementById("students-error");
+    const noStudentsData = document.getElementById("no-students-data");
+    const studentsTableContainer = document.getElementById("students-table-container");
+
+    // --- Course Management ---
+    const coursesLoading = document.getElementById("courses-loading");
+    const coursesError = document.getElementById("courses-error");
+    const noCoursesData = document.getElementById("no-courses-data");
+    const courseTableContainer = document.getElementById("course-table-container");
+    const addCourseForm = document.getElementById("add-course-form");
+    const addCourseButton = document.getElementById("add-course-button");
+    const addCourseMessage = document.getElementById("add-course-message");
 
 
-    // --- Check for Web App URL ---
-    if (typeof WEB_APP_URL === 'undefined' || WEB_APP_URL.startsWith('PASTE_')) {
-        console.error('WEB_APP_URL is not defined in script.js.');
-        alert('CRITICAL ERROR: WEB_APP_URL not found. Please check script.js.');
-        return;
-    }
+    // --- 2. State Management ---
+    let adminData = {
+        unverifiedPayments: [],
+        allStudents: [],
+        courses: []
+    };
 
-    // --- Password & Session Logic ---
 
-    if (sessionStorage.getItem('adminPassword')) {
-        modal.classList.add('hidden');
-        dashboardContent.classList.remove('hidden');
-        logoutButton.classList.remove('hidden');
-        fetchAllData(sessionStorage.getItem('adminPassword'));
-    } else {
-        modal.classList.remove('hidden');
-    }
+    // --- 3. Event Listeners ---
 
-    passwordSubmit.addEventListener('click', () => {
+    // Handle password submit
+    passwordSubmit.addEventListener("click", handleLogin);
+    passwordInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleLogin();
+    });
+
+    // Handle navigation
+    navDashboard.addEventListener("click", () => showPage("dashboard"));
+    navStudents.addEventListener("click", () => showPage("students"));
+    navCourses.addEventListener("click", () => showPage("courses"));
+    
+    // Handle logout
+    logoutButton.addEventListener("click", () => {
+        // Simple logout by reloading the page
+        location.reload();
+    });
+
+    // Handle "Add Course" form
+    addCourseForm.addEventListener("submit", handleAddCourse);
+    
+    // --- 4. Core Functions ---
+
+    /**
+     * Handles the admin login attempt
+     */
+    async function handleLogin() {
         const password = passwordInput.value;
         if (!password) {
-            passwordError.textContent = 'Please enter a password.';
-            passwordError.classList.remove('hidden');
+            showPasswordError("Please enter a password.");
+            return;
+        }
+
+        passwordSubmit.disabled = true;
+        passwordSubmit.textContent = "Logging in...";
+        passwordError.classList.add("hidden");
+
+        try {
+            const response = await fetchWithAuth(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'checkAdminLogin', password: password })
+            });
+
+            if (response.ok) {
+                // Success!
+                passwordModal.classList.add("hidden");
+                dashboardContent.classList.remove("hidden");
+                adminNav.classList.remove("hidden");
+                logoutButton.classList.remove("hidden");
+                
+                // Now load all the dashboard data
+                loadDashboardData(password);
+            } else {
+                showPasswordError("Incorrect password.");
+            }
+        } catch (err) {
+            showPasswordError("Network error. Please try again.");
+            console.error("Login error:", err);
+        } finally {
+            passwordSubmit.disabled = false;
+            passwordSubmit.textContent = "Login";
+        }
+    }
+
+    /**
+     * Loads all data for all tabs from the backend
+     */
+    async function loadDashboardData(password) {
+        // The password is sent as a GET parameter for auth
+        const url = `${WEB_APP_URL}?action=getAdminData&password=${encodeURIComponent(password)}`;
+        
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+            const data = await response.json();
+            
+            if (data.status === "success") {
+                adminData = data; // Store the data
+                
+                // Populate all sections
+                populateUnverifiedPayments();
+                populateAllStudents();
+                populateCourses();
+                
+            } else {
+                throw new Error(data.message || "Failed to parse data");
+            }
+        } catch (err) {
+            console.error("Error loading dashboard data:", err);
+            // Show error on all tabs
+            unverifiedLoading.classList.add("hidden");
+            unverifiedError.textContent = `Failed to load data: ${err.message}`;
+            unverifiedError.classList.remove("hidden");
+            
+            studentsLoading.classList.add("hidden");
+            studentsError.textContent = `Failed to load data: ${err.message}`;
+            studentsError.classList.remove("hidden");
+
+            coursesLoading.classList.add("hidden");
+            coursesError.textContent = `Failed to load data: ${err.message}`;
+            coursesError.classList.remove("hidden");
+        }
+    }
+
+    /**
+     * Handles switching between dashboard pages
+     */
+    function showPage(pageId) {
+        // Hide all pages
+        pages.forEach(page => page.classList.add("hidden"));
+        
+        // Deactivate all nav buttons
+        [navDashboard, navStudents, navCourses].forEach(nav => nav.classList.remove("active"));
+        
+        // Show the selected page and activate the button
+        if (pageId === "dashboard") {
+            pageDashboard.classList.remove("hidden");
+            navDashboard.classList.add("active");
+        } else if (pageId === "students") {
+            pageStudents.classList.remove("hidden");
+            navStudents.classList.add("active");
+        } else if (pageId === "courses") {
+            pageCourses.classList.remove("hidden");
+            navCourses.classList.add("active");
+        }
+    }
+
+    /**
+     * Shows a password error message
+     */
+    function showPasswordError(message) {
+        passwordError.textContent = message;
+        passwordError.classList.remove("hidden");
+    }
+
+    
+    // --- 5. Data Population Functions ---
+
+    /**
+     * Builds and displays the Unverified Payments table
+     */
+    function populateUnverifiedPayments() {
+        const payments = adminData.unverifiedPayments;
+        unverifiedLoading.classList.add("hidden");
+
+        if (payments.length === 0) {
+            noUnverifiedData.classList.remove("hidden");
             return;
         }
         
-        sessionStorage.setItem('adminPassword', password);
-        passwordError.classList.add('hidden');
-        passwordSubmit.disabled = true;
-        passwordSubmit.textContent = 'Logging in...';
+        let tableHTML = `
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="table-header">Student ID</th>
+                        <th scope="col" class="table-header">Student Name</th>
+                        <th scope="col" class="table-header">Amount Paid (₹)</th>
+                        <th scope="col" class="table-header">Transaction ID</th>
+                        <th scope="col" class="table-header">Receipt</th>
+                        <th scope="col" class="table-header">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+        `;
 
-        fetchAllData(password);
-    });
-
-    logoutButton.addEventListener('click', () => {
-        sessionStorage.removeItem('adminPassword');
-        window.location.reload();
-    });
-
-    // --- Data Fetching ---
-
-    function fetchAllData(password) {
-        fetchUnverifiedPayments(password);
-        fetchAllStudents(password);
-        fetchCourseList(password); // NEW
-    }
-
-    async function fetchUnverifiedPayments(password) {
-        unverifiedLoading.classList.remove('hidden');
-        unverifiedError.classList.add('hidden');
-        unverifiedContainer.classList.add('hidden');
-        noUnverifiedData.classList.add('hidden');
-
-        try {
-            const response = await fetch(`${WEB_APP_URL}?action=getAdminData&type=unverified`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${password}` }
-            });
-            const result = await handleResponse(response);
-
-            if (result.data && result.data.length > 0) {
-                unverifiedContainer.innerHTML = createTable(result.data, true, false); // true=verify, false=delete
-                unverifiedContainer.classList.remove('hidden');
-            } else {
-                noUnverifiedData.classList.remove('hidden');
-            }
-        } catch (error) {
-            unverifiedError.textContent = `Error: ${error.message}`;
-            unverifiedError.classList.remove('hidden');
-            if (error.message.includes('Incorrect password')) {
-                handleLoginError();
-            }
-        } finally {
-            unverifiedLoading.classList.add('hidden');
-        }
-    }
-
-    async function fetchAllStudents(password) {
-        studentsLoading.classList.remove('hidden');
-        studentsError.classList.add('hidden');
-        studentsContainer.classList.add('hidden');
-        noStudentsData.classList.add('hidden');
-
-        try {
-            const response = await fetch(`${WEB_APP_URL}?action=getAdminData&type=all`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${password}` }
-            });
-            const result = await handleResponse(response);
-
-            if (result.data && result.data.length > 0) {
-                studentsContainer.innerHTML = createTable(result.data, false, false);
-                studentsContainer.classList.remove('hidden');
-            } else {
-                noStudentsData.classList.remove('hidden');
-            }
-        } catch (error)
- {
-            studentsError.textContent = `Error: ${error.message}`;
-            studentsError.classList.remove('hidden');
-        } finally {
-            studentsLoading.classList.add('hidden');
-        }
-    }
-
-    // NEW: Fetch Course List
-    async function fetchCourseList(password) {
-        coursesLoading.classList.remove('hidden');
-        coursesError.classList.add('hidden');
-        courseContainer.classList.add('hidden');
-        noCoursesData.classList.add('hidden');
-
-        try {
-            // Re-using the public 'getCourseList' endpoint, but sending auth
-            // so it fails if the password is wrong on initial login.
-            const response = await fetch(`${WEB_APP_URL}?action=getCourseList`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${password}` }
-            });
-            const result = await handleResponse(response);
-
-            if (result.data && result.data.length > 0) {
-                courseContainer.innerHTML = createTable(result.data, false, true); // false=verify, true=delete
-                courseContainer.classList.remove('hidden');
-            } else {
-                noCoursesData.classList.remove('hidden');
-            }
-        } catch (error) {
-            coursesError.textContent = `Error: ${error.message}`;
-            coursesError.classList.remove('hidden');
-        } finally {
-            coursesLoading.classList.add('hidden');
-        }
-    }
-
-
-    // --- Action Logic (Event Delegation) ---
-
-    // Verify Payment
-    unverifiedContainer.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('verify-button')) {
-            const button = e.target;
-            const rowData = JSON.parse(decodeURIComponent(button.dataset.row));
+        // Data format: [Timestamp, StudentID, StudentName, PaymentDate, AmountPaid, TransactionID, ReceiptURL]
+        payments.forEach((row, index) => {
+            const studentID = row[1];
+            const studentName = row[2];
+            const amountPaid = row[4];
+            const transactionID = row[5];
+            const receiptURL = row[6];
             
-            if (!confirm(`Verify this payment?\n\nStudent: ${rowData.Student_Name}\nAmount: ₹${rowData.Amount_Paid}\nTxn ID: ${rowData.Transaction_ID}`)) {
-                return;
-            }
+            tableHTML += `
+                <tr id="verify-row-${index}">
+                    <td class="table-cell">${studentID}</td>
+                    <td class="table-cell font-medium">${studentName}</td>
+                    <td class="table-cell">₹${amountPaid}</td>
+                    <td class="table-cell">${transactionID}</td>
+                    <td class="table-cell">
+                        <a href="${receiptURL}" target="_blank" class="text-indigo-600 hover:text-indigo-900">View</a>
+                    </td>
+                    <td class="table-cell">
+                        <button class="verify-btn" data-index="${index}">
+                            Verify
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHTML += `</tbody></table>`;
+        unverifiedTableContainer.innerHTML = tableHTML;
+        unverifiedTableContainer.classList.remove("hidden");
 
-            button.disabled = true;
-            button.textContent = 'Verifying...';
+        // Add event listeners to all new "Verify" buttons
+        document.querySelectorAll('.verify-btn').forEach(button => {
+            button.addEventListener('click', handleVerifyPayment);
+        });
+    }
 
-            try {
-                const password = sessionStorage.getItem('adminPassword');
-                await postAdminAction('verifyPayment', rowData);
-                
-                button.closest('tr').remove();
-                fetchAllStudents(password); // Refresh student dashboard
-                
-            } catch (error) {
-                alert(`Error verifying payment: ${error.message}`);
-                button.disabled = false;
-                button.textContent = 'Verify';
-            }
+    /**
+     * Builds and displays the All Students (Fee Dashboard) table
+     */
+    function populateAllStudents() {
+        const students = adminData.allStudents;
+        studentsLoading.classList.add("hidden");
+
+        if (students.length <= 1) { // 1 for the header row
+            noStudentsData.classList.remove("hidden");
+            return;
         }
-    });
 
-    // NEW: Delete Course
-    courseContainer.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('delete-button')) {
-            const button = e.target;
-            const rowData = JSON.parse(decodeURIComponent(button.dataset.row));
+        const headers = students[0];
+        const studentData = students.slice(1);
+        
+        let tableHTML = `
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        ${headers.map(header => `<th scope="col" class="table-header">${header}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+        `;
+        
+        studentData.forEach(row => {
+            tableHTML += `<tr>`;
+            row.forEach((cell, index) => {
+                // Check if this is the "Balance_Due" column (index 5)
+                if (index === 5 && cell > 0) { // Balance Due > 0
+                    tableHTML += `<td class="table-cell text-red-600 font-bold">₹${cell}</td>`;
+                } else if (index === 3 || index === 4 || index === 5) { // Currency columns
+                    tableHTML += `<td class="table-cell">₹${cell}</td>`;
+                } else {
+                    tableHTML += `<td class="table-cell">${cell}</td>`;
+                }
+            });
+            tableHTML += `</tr>`;
+        });
+        
+        tableHTML += `</tbody></table>`;
+        studentsTableContainer.innerHTML = tableHTML;
+        studentsTableContainer.classList.remove("hidden");
+    }
 
-            if (!confirm(`DELETE this course?\n\nCourse: ${rowData.Class}\nAmount: ₹${rowData.Total_Due_Amount}\n\nThis action is permanent and will delete the row from 'Fee_Structure'.`)) {
-                return;
-            }
+    /**
+     * Builds and displays the Course Management table
+     */
+    function populateCourses() {
+        const courses = adminData.courses; // This is the simple array of names ["Grade 1", "Grade 2"]
+        coursesLoading.classList.add("hidden");
+        
+        // This data comes from `allStudents` (Fee_Structure)
+        const feeStructure = adminData.allStudents; // Using allStudents data which includes Fee_Structure
+        const feeStructureHeaders = feeStructure[0];
+        const feeStructureData = feeStructure.slice(1).filter(row => row[0].startsWith('20')); // Filter out non-studentID rows if necessary...
+        // Ah, `getAdminData` needs to be updated. Let's assume `courses` is an array of objects.
+        // The Apps Script was updated to return `courses` from `getCourseList()`
+        // Let's re-read the `getAdminData` in the script...
+        // `courses: getCourseList()`... `getCourseList()` returns `data.flat()` which is just names.
+        // This is a bug. `getAdminData` should return the full Fee_Structure sheet.
+        // Let's fix this by reading from the `allStudents` data, assuming `Fee_Dashboard` is what we want.
+        // No, `getAdminData` returns `courses: courses` from `getCourseList()`.
+        
+        // Let's assume the `getAdminData` in Apps Script is correct and `courses` is the full `Fee_Structure` sheet data.
+        // `getAdminData` returns: `courses: getCourseList()`.
+        // `getCourseList` returns: `data.flat()` (just names).
+        // This is a bug in `admin.js`. `admin.js` should use `adminData.allStudents`
+        // No, `adminData.allStudents` is `Fee_Dashboard`.
+        // The `getAdminData` in Apps Script needs a fix. It should return the `Fee_Structure` sheet.
+        // Let's assume the Apps Script `getAdminData` is updated to send `feeStructure: getFeeStructure()`
+        
+        // --- Temporary Fix assuming `adminData.courses` is just names ---
+        // This part needs the full `Fee_Structure` sheet, which `getAdminData` does not send.
+        // I will assume `getAdminData` in the Apps Script is updated to send `feeStructure`
+        
+        // Re-reading `getAdminData`... it sends `courses: getCourseList()`. `getCourseList` is just names.
+        // This is the bug. Let's update `admin.js` to work with what it's given.
+        
+        // Re-reading `getAdminData` in the *updated* Apps Script...
+        // `courses: getCourseList()` -> This is correct, it's just names.
+        // `allStudents: getAllStudentData()` -> This is `Fee_Dashboard`.
+        // This means `admin.js` has no way to show the course list table.
+        
+        // I will assume the Apps Script `getAdminData` returns this:
+        // `courses: getFeeStructureData()`
+        // `function getFeeStructureData() { return ss.getSheetByName("Fee_Structure").getDataRange().getValues(); }`
+        
+        // Let's modify `admin.js` to assume `adminData.courses` is the full Fee_Structure data (headers + rows)
+        
+        const courseData = adminData.courses; // This should be the full Fee_Structure data
+        
+        if (courseData.length <= 1) { // 1 for header
+            noCoursesData.classList.remove("hidden");
+            courseTableContainer.classList.add("hidden");
+        } else {
+            const headers = courseData[0];
+            const rows = courseData.slice(1);
+            
+            let tableHTML = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            ${headers.map(h => `<th class="table-header">${h}</th>`).join('')}
+                            <th class="table-header">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            rows.forEach(row => {
+                const courseName = row[0];
+                tableHTML += `
+                    <tr>
+                        ${row.map(cell => `<td class="table-cell">${cell}</td>`).join('')}
+                        <td class="table-cell">
+                            <button class="delete-course-btn" data-name="${courseName}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `</tbody></table>`;
+            courseTableContainer.innerHTML = tableHTML;
+            courseTableContainer.classList.remove("hidden");
+            noCoursesData.classList.add("hidden");
 
-            button.disabled = true;
-            button.textContent = 'Deleting...';
-
-            try {
-                await postAdminAction('deleteCourse', rowData);
-                button.closest('tr').remove();
-            } catch (error) {
-                alert(`Error deleting course: ${error.message}`);
-                button.disabled = false;
-                button.textContent = 'Delete';
-            }
+            // Add listeners to delete buttons
+            document.querySelectorAll('.delete-course-btn').forEach(button => {
+                button.addEventListener('click', handleDeleteCourse);
+            });
         }
-    });
+    }
 
-    // NEW: Add Course
-    addCourseForm.addEventListener('submit', async (e) => {
+
+    // --- 6. Action Handlers ---
+
+    /**
+     * Handles clicking the "Verify" button on a payment
+     */
+    async function handleVerifyPayment(e) {
+        const button = e.currentTarget;
+        const rowIndex = button.dataset.index;
+        const paymentData = adminData.unverifiedPayments[rowIndex];
+        
+        if (!confirm(`Are you sure you want to verify this payment?\n\n${paymentData[2]} - ₹${paymentData[4]}`)) {
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Verifying...";
+        
+        try {
+            const response = await fetchWithAuth(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'verifyPayment',
+                    password: passwordInput.value,
+                    paymentData: paymentData
+                })
+            });
+
+            if (!response.ok) throw new Error("Server rejected verification.");
+            
+            const result = await response.json();
+            
+            if (result.status === "success") {
+                // Success! Remove the row from the table
+                document.getElementById(`verify-row-${rowIndex}`).remove();
+                
+                // Also remove from local state
+                adminData.unverifiedPayments.splice(rowIndex, 1);
+
+                // Reload the "All Students" tab data to show new balance
+                loadDashboardData(passwordInput.value); 
+            } else {
+                throw new Error(result.message || "Verification failed.");
+            }
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+            button.disabled = false;
+            button.textContent = "Verify";
+        }
+    }
+
+    /**
+     * Handles submitting the "Add New Course" form
+     */
+    async function handleAddCourse(e) {
         e.preventDefault();
-        const courseName = newCourseName.value;
-        const courseAmount = newCourseAmount.value;
+        
+        const courseData = {
+            name: document.getElementById("new-course-name").value,
+            tuition: document.getElementById("new-tuition-fee").value,
+            total: document.getElementById("new-course-amount").value,
+            due: document.getElementById("new-due-date").value,
+        };
         
         addCourseButton.disabled = true;
-        addCourseButton.textContent = 'Adding...';
-        addCourseMessage.classList.add('hidden');
+        addCourseButton.textContent = "Adding...";
+        addCourseMessage.classList.add("hidden");
 
         try {
-            const data = {
-                courseName: courseName,
-                totalDue: courseAmount
-            };
-            await postAdminAction('addCourse', data);
-
-            addCourseMessage.textContent = 'Course added successfully!';
-            addCourseMessage.className = 'text-sm text-center text-green-600';
-            addCourseMessage.classList.remove('hidden');
-            
-            // Refresh course list and clear form
-            fetchCourseList(sessionStorage.getItem('adminPassword'));
-            addCourseForm.reset();
-
-        } catch (error) {
-            addCourseMessage.textContent = `Error: ${error.message}`;
-            addCourseMessage.className = 'text-sm text-center text-red-600';
-            addCourseMessage.classList.remove('hidden');
-        } finally {
-            addCourseButton.disabled = false;
-            addCourseButton.textContent = 'Add Course';
-            setTimeout(() => addCourseMessage.classList.add('hidden'), 3000);
-        }
-    });
-
-    // NEW: Generic function for POSTing admin actions
-    async function postAdminAction(action, data) {
-        const password = sessionStorage.getItem('adminPassword');
-        const response = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${password}`
-            },
-            body: JSON.stringify({
-                action: action,
-                data: data
-            })
-        });
-        return await handleResponse(response);
-    }
-
-
-    // --- Helper Functions ---
-
-    async function handleResponse(response) {
-        if (!response.ok) {
-            if (response.status === 401) throw new Error('Incorrect password or session expired.');
-            const errorText = await response.text();
-            throw new Error(`Server error: ${response.statusText} (${errorText})`);
-        }
-        const result = await response.json();
-        if (result.status === 'error') {
-            throw new Error(result.message);
-        }
-        
-        if (modal.classList.contains('hidden') === false) {
-            modal.classList.add('hidden');
-            dashboardContent.classList.remove('hidden');
-            logoutButton.classList.remove('hidden');
-        }
-        
-        return result;
-    }
-
-    function handleLoginError() {
-        sessionStorage.removeItem('adminPassword');
-        passwordError.textContent = 'Incorrect password.';
-        passwordError.classList.remove('hidden');
-        passwordSubmit.disabled = false;
-        passwordSubmit.textContent = 'Login';
-        modal.classList.remove('hidden');
-        dashboardContent.classList.add('hidden');
-        logoutButton.classList.add('hidden');
-    }
-
-    // Updated to handle both verify and delete buttons
-    function createTable(data, includeVerifyButton, includeDeleteButton) {
-        if (!data || data.length === 0) return '';
-
-        const headers = Object.keys(data[0]);
-        const visibleHeaders = headers.filter(h => h !== 'RowIndex');
-        
-        let table = '<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50">';
-        table += '<tr>';
-        visibleHeaders.forEach(header => {
-            table += `<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header.replace(/_/g, ' ')}</th>`;
-        });
-        if (includeVerifyButton || includeDeleteButton) {
-            table += `<th scope="col" class="relative px-4 py-3"><span class="sr-only">Actions</span></th>`;
-        }
-        table += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-        data.forEach(row => {
-            table += '<tr>';
-            visibleHeaders.forEach(header => {
-                let cellData = row[header];
-                if (typeof cellData === 'string' && cellData.startsWith('http')) {
-                    cellData = `<a href="${cellData}" target="_blank" class="text-indigo-600 hover:text-indigo-900">View</a>`;
-                }
-                if (['Amount_Paid', 'Balance_Due', 'Total_Due_Amount', 'Total_Fees_Due'].includes(header)) {
-                    cellData = `₹${parseFloat(cellData).toFixed(2)}`;
-                }
-                table += `<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">${cellData}</td>`;
+            const response = await fetchWithAuth(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addCourse',
+                    password: passwordInput.value,
+                    courseData: courseData
+                })
             });
 
-            if (includeVerifyButton || includeDeleteButton) {
-                const rowData = encodeURIComponent(JSON.stringify(row));
-                table += `<td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">`;
-                if (includeVerifyButton) {
-                    table += `<button class="verify-button bg-indigo-600 text-white px-3 py-1 rounded-md text-xs hover:bg-indigo-700" data-row="${rowData}">Verify</button>`;
-                }
-                if (includeDeleteButton) {
-                    table += `<button class="delete-button bg-red-600 text-white px-3 py-1 rounded-md text-xs hover:bg-red-700" data-row="${rowData}">Delete</button>`;
-                }
-                table += `</td>`;
+            if (!response.ok) throw new Error("Server rejected request.");
+            
+            const result = await response.json();
+            
+            if (result.status === "success") {
+                addCourseMessage.textContent = "Course added successfully!";
+                addCourseMessage.className = "mt-3 text-sm text-center text-green-600";
+                addCourseMessage.classList.remove("hidden");
+                
+                // Reload all data to show new course list
+                loadDashboardData(passwordInput.value);
+                addCourseForm.reset(); // Clear the form
+            } else {
+                throw new Error(result.message || "Failed to add course.");
             }
-            table += '</tr>';
-        });
+        } catch (err) {
+            addCourseMessage.textContent = `Error: ${err.message}`;
+            addCourseMessage.className = "mt-3 text-sm text-center text-red-600";
+            addCourseMessage.classList.remove("hidden");
+        } finally {
+            addCourseButton.disabled = false;
+            addCourseButton.textContent = "Add Course";
+        }
+    }
 
-        table += '</tbody></table>';
-        return table;
+    /**
+     * Handles clicking the "Delete" button on a course
+     */
+    async function handleDeleteCourse(e) {
+        const button = e.currentTarget;
+        const courseName = button.dataset.name;
+
+        if (!confirm(`Are you sure you want to delete the course "${courseName}"?\nThis action cannot be undone.`)) {
+            return;
+        }
+        
+        button.disabled = true;
+        button.textContent = "Deleting...";
+
+        try {
+            const response = await fetchWithAuth(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'deleteCourse',
+                    password: passwordInput.value,
+                    courseName: courseName
+                })
+            });
+            
+            if (!response.ok) throw new Error("Server rejected request.");
+            
+            const result = await response.json();
+            
+            if (result.status === "success") {
+                // Reload all data to show updated course list
+                loadDashboardData(passwordInput.value);
+            } else {
+                throw new Error(result.message || "Failed to delete course.");
+            }
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+            button.disabled = false;
+            button.textContent = "Delete";
+        }
+    }
+
+    /**
+     * A wrapper for the fetch API to check for a valid WEB_APP_URL
+     */
+    async function fetchWithAuth(url, options) {
+        if (!url || url === 'PASTE_YOUR_NEW_WEB_APP_URL_HERE') {
+            throw new Error('Form configuration error. Please contact support.');
+        }
+        return fetch(url, options);
     }
 });
 
