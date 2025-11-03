@@ -1,7 +1,7 @@
 // !!! ACTION REQUIRED !!!
 // 1. Deploy your Google Apps Script as a Web App
 // 2. Paste the Web App URL here
-const WEB_APP_URL = 'PASTE_YOUR_NEW_WEB_APP_URL_HERE';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwG5Eu6pOBI2OOXdAWXQPxxiP6Jh03ZPeW5Rb5-b4H7awpL5WFbTwRajVUrFXa09D96mw/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Find UI elements
