@@ -1,62 +1,41 @@
-// !!! ACTION REQUIRED !!!
-// 1. Deploy your Google Apps Script as a Web App
-// 2. Paste the Web App URL here
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwG5Eu6pOBI2OOXdAWXQPxxiP6Jh03ZPeW5Rb5-b4H7awpL5WFbTwRajVUrFXa09D96mw/exec';
+/*
+  --- MAIN SCRIPT ---
+  This file holds the central configuration for your web app.
+*/
 
+// !!! IMPORTANT !!!
+// 1. Deploy your Google Apps Script file ("sendReceiptEmail.js").
+// 2. Copy the "Web app URL" it gives you.
+// 3. Paste that URL here inside the quotes.
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzZgpQs1Ddy9WHcH_HFwVY48VyFQNhj6rziSvuIrVm7/dev';
+
+// --- Homepage Dashboard (for index.html) ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Find UI elements
-    const loadingDiv = document.getElementById('dashboard-loading');
-    const contentDiv = document.getElementById('dashboard-content');
-    const dueDateSpan =.getElementById('next-due-date');
-    
-    // --- FIX ---
-    // Check if the URL is still the placeholder text.
-    // If it is, don't try to fetch. Show an error message instead.
-    if (WEB_APP_URL.startsWith('PASTE_')) {
-        console.warn('Please paste your Web App URL into the WEB_APP_URL variable in script.js');
-        if (dueDateSpan) {
-            dueDateSpan.textContent = 'Please update Web App URL in script.js';
-        }
-        if (loadingDiv) {
-            loadingDiv.style.display = 'none';
-        }
-        if (contentDiv) {
-            contentDiv.style.display = 'block';
-        }
-        return; // Stop the script from running the broken fetch
+    // Check if we are on the homepage
+    const dueDateElement = document.getElementById('next-due-date');
+    if (!dueDateElement) {
+        return; // Not the homepage, do nothing.
     }
 
-    // Fetch data from our Google Apps Script API
+    if (typeof WEB_APP_URL === 'undefined' || WEB_APP_URL.startsWith('PASTE_')) {
+        console.error('WEB_APP_URL is not defined in script.js.');
+        dueDateElement.textContent = 'Error: Config';
+        return;
+    }
+
+    // Fetch the next due date from Google Apps Script
     fetch(WEB_APP_URL)
         .then(response => response.json())
         .then(data => {
-            if (data && data.status === 'success' && data.nextDueDate) {
-                if (dueDateSpan) {
-                    dueDateSpan.textContent = data.nextDueDate;
-                }
+            if (data.status === 'success' && data.nextDueDate) {
+                dueDateElement.textContent = data.nextDueDate;
             } else {
-                if (dueDateSpan) {
-                    dueDateSpan.textContent = 'Not available';
-                }
-            }
-            // Hide loading spinner and show content
-            if (loadingDiv) {
-                loadingDiv.style.display = 'none';
-            }
-            if (contentDiv) {
-                contentDiv.style.display = 'block';
+                dueDateElement.textContent = 'TBA';
             }
         })
         .catch(error => {
-            console.error('Error fetching dashboard data:', error);
-            if (dueDateSpan) {
-                dueDateSpan.textContent = 'Error loading data';
-            }
-            if (loadingDiv) {
-                loadingDiv.style.display = 'none';
-            }
-            if (contentDiv) {
-                contentDiv.style.display = 'block';
-            }
+            console.error('Error fetching due date:', error);
+            dueDateElement.textContent = 'Error';
         });
 });
+
