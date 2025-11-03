@@ -7,7 +7,7 @@
 // 1. Deploy your Google Apps Script file ("sendReceiptEmail.js").
 // 2. Copy the "Web app URL" it gives you.
 // 3. Paste that URL here inside the quotes.
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzZgpQs1Ddy9WHcH_HFwVY48VyFQNhj6rziSvuIrVm7/dev';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzrZr_t-b7htCME1z8U6zGFzY8pO67mQcGpISWgpQ57RWH2XkzT81eR3X9pWnih15mpww/exec';
 
 // --- Homepage Dashboard (for index.html) ---
 document.addEventListener('DOMContentLoaded', () => {
