@@ -23,6 +23,15 @@
         </nav>
     </header>
 
+    <!-- Admin Navigation (Hidden by default) -->
+    <div id="admin-nav-container" class="hidden bg-white border-b border-gray-200">
+        <nav class="container mx-auto max-w-5xl px-4 flex space-x-6">
+            <button id="nav-dashboard" class="admin-nav-item active">Dashboard</button>
+            <button id="nav-students" class="admin-nav-item">All Students</button>
+            <button id="nav-courses" class="admin-nav-item">Course Management</button>
+        </nav>
+    </div>
+
     <!-- Main Content -->
     <main class="container mx-auto max-w-5xl px-4 py-10">
 
@@ -47,37 +56,89 @@
         <!-- Dashboard Content (Hidden by default) -->
         <div id="dashboard-content" class="hidden space-y-10">
             
-            <!-- Section: Unverified Payments -->
-            <section id="unverified-payments">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">Unverified Payments</h2>
-                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-                    <div id="unverified-loading" class="p-6 text-center text-gray-500">
-                        <div class="spinner mx-auto mb-2"></div>
-                        Loading unverified payments...
+            <!-- Page 1: Dashboard (Unverified Payments) -->
+            <div id="page-dashboard" class="admin-page space-y-10">
+                <section id="unverified-payments">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Unverified Payments</h2>
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                        <div id="unverified-loading" class="p-6 text-center text-gray-500">
+                            <div class="spinner mx-auto mb-2"></div>
+                            Loading unverified payments...
+                        </div>
+                        <p id="unverified-error" class="hidden p-6 text-center text-red-600"></p>
+                        <div id="unverified-table-container" class="hidden">
+                            <!-- This table will be populated by admin.js -->
+                        </div>
+                        <p id="no-unverified-data" class="hidden p-6 text-center text-gray-500">No unverified payments found.</p>
                     </div>
-                    <p id="unverified-error" class="hidden p-6 text-center text-red-600"></p>
-                    <div id="unverified-table-container" class="hidden">
-                        <!-- This table will be populated by admin.js -->
-                    </div>
-                    <p id="no-unverified-data" class="hidden p-6 text-center text-gray-500">No unverified payments found.</p>
-                </div>
-            </section>
+                </section>
+            </div>
 
-            <!-- Section: All Students Dashboard -->
-            <section id="all-students">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">All Students (Fee Dashboard)</h2>
-                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-                    <div id="students-loading" class="p-6 text-center text-gray-500">
-                        <div class="spinner mx-auto mb-2"></div>
-                        Loading all students...
+            <!-- Page 2: All Students Dashboard -->
+            <div id="page-students" class="admin-page hidden space-y-10">
+                <section id="all-students">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">All Students (Fee Dashboard)</h2>
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                        <div id="students-loading" class="p-6 text-center text-gray-500">
+                            <div class="spinner mx-auto mb-2"></div>
+                            Loading all students...
+                        </div>
+                        <p id="students-error" class="hidden p-6 text-center text-red-600"></p>
+                        <div id="students-table-container" class="hidden">
+                            <!-- This table will be populated by admin.js -->
+                        </div>
+                        <p id="no-students-data" class="hidden p-6 text-center text-gray-500">No students found.</p>
                     </div>
-                    <p id="students-error" class="hidden p-6 text-center text-red-600"></p>
-                    <div id="students-table-container" class="hidden">
-                        <!-- This table will be populated by admin.js -->
+                </section>
+            </div>
+
+            <!-- Page 3: Course Management -->
+            <div id="page-courses" class="admin-page hidden space-y-10">
+                <section id="course-management">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Course Management (Fee Structure)</h2>
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                        <!-- Loading/Error States -->
+                        <div id="courses-loading" class="p-6 text-center text-gray-500">
+                            <div class="spinner mx-auto mb-2"></div>
+                            Loading courses...
+                        </div>
+                        <p id="courses-error" class="hidden p-6 text-center text-red-600"></p>
+                        
+                        <!-- Course Table -->
+                        <div id="course-table-container" class="hidden">
+                            <!-- This table will be populated by admin.js -->
+                        </div>
+                        <p id="no-courses-data" class="hidden p-6 text-center text-gray-500">No courses found. Add one below.</p>
+                        
+                        <!-- Add New Course Form -->
+                        <div class="border-t border-gray-200 bg-gray-50 p-6">
+                            <h3 class="text-lg font-semibold text-gray-700 mb-4">Add New Course</h3>
+                            <form id="add-course-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                <div>
+                                    <label for="new-course-name" class="block text-sm font-medium text-gray-700">Course Name (Grade)</label>
+                                    <input type="text" id="new-course-name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="new-tuition-fee" class="block text-sm font-medium text-gray-700">Tuition Fee (₹)</label>
+                                    <input type="number" id="new-tuition-fee" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="new-course-amount" class="block text-sm font-medium text-gray-700">Total Due Amount (₹)</label>
+                                    <input type="number" id="new-course-amount" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="new-due-date" class="block text-sm font-medium text-gray-700">Due Date</label>
+                                    <input type="date" id="new-due-date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <button type="submit" id="add-course-button" class="md:col-span-4 w-full md:w-auto flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                    Add Course
+                                </button>
+                            </form>
+                            <p id="add-course-message" class="hidden mt-3 text-sm text-center"></p>
+                        </div>
                     </div>
-                    <p id="no-students-data" class="hidden p-6 text-center text-gray-500">No students found.</p>
-                </div>
-            </section>
+                </section>
+            </div>
 
         </div>
     </main>
@@ -88,3 +149,4 @@
     <script src="admin.js"></script>
 </body>
 </html>
+
